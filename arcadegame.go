@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"math/rand"
 
 	"github.com/jackyb/go-sdl2/sdl"
 	"github.com/jackyb/go-sdl2/sdl_image"
@@ -77,8 +78,10 @@ func main() {
 
 		drawShip(r)
 		drawMissiles(r)
-
+		drawObstacles(r)
 	}
+
+	lastObstacleTick := sdl.GetTicks()
 
 	game.UpdateCallback = func(delta float64) {
 		moveSpeed := delta * 100
@@ -86,6 +89,16 @@ func main() {
 		keystate := sdl.GetKeyboardState()
 
 		updateMissiles(moveSpeed * 3)
+		updateObstacles(delta)
+
+		if sdl.GetTicks() > lastObstacleTick+500 && rand.Intn(20) == 0 {
+			lastObstacleTick = sdl.GetTicks()
+			size := rand.Float64()*50.0 + 10.0
+			y := rand.Float64() * SCREEN_HEIGHT
+			x := SCREEN_WIDTH + size
+			speed := rand.Float64()*80.0 + 50.0
+			obstacles = append(obstacles, Obstacle{x, y, speed, size, 0})
+		}
 
 		if keystate[sdl.SCANCODE_W] != 0 {
 			y -= moveSpeed
@@ -120,17 +133,6 @@ type FloatPoint struct {
 	X, Y float64
 }
 
-func updateMissiles(moveSpeed float64) {
-	newMissiles := make([]FloatPoint, 0, len(missiles))
-	for _, p := range missiles {
-		p.X += moveSpeed
-		if p.X <= SCREEN_WIDTH {
-			newMissiles = append(newMissiles, p)
-		}
-	}
-	missiles = newMissiles
-}
-
 var lastFire = sdl.GetTicks()
 
 var shipPoints = [...]sdl.Point{sdl.Point{30, 0}, sdl.Point{-20, -15}, sdl.Point{-20, 15}}
@@ -152,10 +154,44 @@ func drawShip(r *sdl.Renderer) {
 var missiles = []FloatPoint{}
 
 func drawMissiles(r *sdl.Renderer) {
-	if len(missiles) > 0 {
-		for _, p := range missiles {
-			r.DrawPoint(int(p.X), int(p.Y))
+	for _, p := range missiles {
+		r.DrawPoint(int(p.X), int(p.Y))
+	}
+}
+
+func updateMissiles(moveSpeed float64) {
+	newMissiles := make([]FloatPoint, 0, len(missiles))
+	for _, p := range missiles {
+		p.X += moveSpeed
+		if p.X <= SCREEN_WIDTH {
+			newMissiles = append(newMissiles, p)
 		}
 	}
+	missiles = newMissiles
+}
 
+type Obstacle struct {
+	X, Y, Speed, Size, Angle float64
+}
+
+var obstacles = []Obstacle{}
+
+func drawObstacles(r *sdl.Renderer) {
+	r.SetDrawColor(255, 128, 100, 255)
+	for _, o := range obstacles {
+		rect := sdl.Rect{int32(o.X - o.Size), int32(o.Y - o.Size), int32(o.Size), int32(o.Size)}
+		r.DrawRect(&rect)
+	}
+}
+
+func updateObstacles(delta float64) {
+	newObstacles := make([]Obstacle, 0, len(obstacles))
+	for _, o := range obstacles {
+		o.X -= delta * o.Speed
+		o.Angle += delta * o.Speed
+		if o.X > -o.Size {
+			newObstacles = append(newObstacles, o)
+		}
+	}
+	obstacles = newObstacles
 }
