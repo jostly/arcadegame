@@ -12,15 +12,16 @@ import (
 var running = true
 
 var (
-	RenderCallback  func(*sdl.Renderer) = func(_ *sdl.Renderer) {}
-	MovementHandler func(float64)       = func(_ float64) {}
+	RenderCallback func(*sdl.Renderer) = func(_ *sdl.Renderer) {}
+	UpdateCallback func(float64)       = func(_ float64) {}
+	StatusCallback func() string       = func() string { return "" }
 )
 
 func MainLoop(renderer *sdl.Renderer, font *ttf.Font) {
 	lastTick := sdl.GetTicks()
 	lastSecond := lastTick
 	frames := 0
-	fpsText := gfx.CreateText(renderer, font, "FPS: ...", sdl.Color{255, 255, 255, 255})
+	fpsText := gfx.CreateText(renderer, font, "FPS: ... "+StatusCallback(), sdl.Color{255, 255, 255, 255})
 
 	for running {
 
@@ -32,17 +33,17 @@ func MainLoop(renderer *sdl.Renderer, font *ttf.Font) {
 		if tick > (lastSecond + 1000) {
 			lastSecond = tick
 			fpsText.Destroy()
-			fpsText = gfx.CreateText(renderer, font, fmt.Sprintf("FPS: %d", frames), sdl.Color{255, 255, 255, 255})
+			fpsText = gfx.CreateText(renderer, font, fmt.Sprintf("FPS: %d ", frames)+StatusCallback(), sdl.Color{255, 255, 255, 255})
 			frames = 0
 		} else {
 			frames++
 		}
 
-		for handleEvent() {
-		}
+		handleEvents()
 
-		MovementHandler(delta)
+		UpdateCallback(delta)
 
+		renderer.SetDrawColor(0, 0, 0, 0)
 		renderer.Clear()
 
 		RenderCallback(renderer)
@@ -50,24 +51,28 @@ func MainLoop(renderer *sdl.Renderer, font *ttf.Font) {
 		gfx.RenderTexture(renderer, fpsText, 0, 0)
 
 		renderer.Present()
+
+		sdl.Delay(1)
 	}
 
 	fpsText.Destroy()
 }
 
-func handleEvent() bool {
-	event := sdl.PollEvent()
-	if event == nil {
-		return false
+func handleEvents() {
+	for {
+		event := sdl.PollEvent()
+		if event == nil {
+			return
+		}
+		switch event := event.(type) {
+		case *sdl.QuitEvent:
+			log.Println("Quit!")
+			running = false
+		case *sdl.KeyDownEvent:
+			handleKey(event.Keysym)
+		}
+
 	}
-	switch event := event.(type) {
-	case *sdl.QuitEvent:
-		log.Println("Quit!")
-		running = false
-	case *sdl.KeyDownEvent:
-		handleKey(event.Keysym)
-	}
-	return true
 }
 
 func handleKey(keysym sdl.Keysym) {
