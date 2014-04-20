@@ -7,6 +7,7 @@ import (
 
 	"github.com/jackyb/go-sdl2/sdl"
 	"github.com/jackyb/go-sdl2/sdl_image"
+	"github.com/jackyb/go-sdl2/sdl_mixer"
 	ttf "github.com/jackyb/go-sdl2/sdl_ttf"
 	"github.com/jostly/arcadegame/game"
 )
@@ -56,7 +57,7 @@ func main() {
 
 	defer renderer.Destroy()
 
-	texture := img.LoadTexture(renderer, "images/exampletexture_2.png")
+	texture := img.LoadTexture(renderer, "assets/images/exampletexture_2.png")
 
 	if texture == nil {
 		error("Error creating texture")
@@ -65,14 +66,32 @@ func main() {
 
 	defer texture.Destroy()
 
-	font, error := ttf.OpenFont("fonts/ComicNeue-Regular.ttf", 18)
+	font, err := ttf.OpenFont("assets/fonts/ComicNeue-Regular.ttf", 18)
 
-	if error != nil {
+	if err != nil {
 		log.Printf("Error when loading font: %v", error)
 		return
 	}
 
 	defer font.Close()
+
+	ok := mix.OpenAudio(22050, mix.DEFAULT_FORMAT, 2, 1024)
+	if !ok {
+		error("Can't open audio")
+		return
+	}
+
+	defer mix.CloseAudio()
+
+	mix.AllocateChannels(0)
+
+	shoot := mix.LoadMUS("assets/audio/shoot.ogg")
+	if shoot == nil {
+		error("Can't load ogg sound")
+		return
+	}
+
+	defer shoot.Free()
 
 	game.RenderCallback = func(r *sdl.Renderer) {
 
@@ -117,6 +136,7 @@ func main() {
 			if currentTick > lastFire+300 {
 				lastFire = currentTick
 				missiles = append(missiles, FloatPoint{x + 32, y})
+				shoot.Play(1)
 			}
 		}
 	}

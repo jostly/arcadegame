@@ -26,6 +26,11 @@ func MainLoop(renderer *sdl.Renderer, font *ttf.Font) {
 	for running {
 
 		tick := sdl.GetTicks()
+		if tick < lastTick+10 {
+			sdl.Delay(1)
+
+			continue
+		}
 
 		delta := float64(tick-lastTick) / 1000.0
 		lastTick = tick
@@ -52,7 +57,6 @@ func MainLoop(renderer *sdl.Renderer, font *ttf.Font) {
 
 		renderer.Present()
 
-		sdl.Delay(1)
 	}
 
 	fpsText.Destroy()
