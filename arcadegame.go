@@ -8,18 +8,22 @@ import (
 	"github.com/jackyb/go-sdl2/sdl"
 	"github.com/jackyb/go-sdl2/sdl_image"
 	"github.com/jackyb/go-sdl2/sdl_mixer"
-	ttf "github.com/jackyb/go-sdl2/sdl_ttf"
+	"github.com/jackyb/go-sdl2/sdl_ttf"
 	"github.com/jostly/arcadegame/game"
 )
 
 const (
-	SCREEN_WIDTH  = 640
-	SCREEN_HEIGHT = 480
+	SCREEN_WIDTH            = 640
+	SCREEN_HEIGHT           = 480
+	EnergyCostPerShot       = 15.
+	EnergyRegainedPerSecond = 15.
 )
 
 var (
-	x = float64(SCREEN_WIDTH / 4)
-	y = float64(SCREEN_HEIGHT / 2)
+	x      = float64(SCREEN_WIDTH / 4)
+	y      = float64(SCREEN_HEIGHT / 2)
+	score  = 0
+	energy = 100.
 )
 
 func error(message string) {
@@ -27,7 +31,6 @@ func error(message string) {
 }
 
 func main() {
-	log.Println("SDL2 Tutorial #1")
 
 	if sdl.Init(sdl.INIT_EVERYTHING) != 0 {
 		error("Error initializing SDL")
@@ -83,8 +86,10 @@ func main() {
 
 	defer mix.CloseAudio()
 
-	mix.AllocateChannels(0)
+	mix.AllocateChannels(2)
 
+	// Might have to convert sound effects to wav to load them as audio
+	// and not music?
 	shoot := mix.LoadMUS("assets/audio/shoot.ogg")
 	if shoot == nil {
 		error("Can't load ogg sound")
@@ -92,6 +97,14 @@ func main() {
 	}
 
 	defer shoot.Free()
+
+	explode := mix.LoadMUS("assets/audio/invaderkilled.ogg")
+	if explode == nil {
+		error("Can't load ogg sound")
+		return
+	}
+
+	defer explode.Free()
 
 	game.RenderCallback = func(r *sdl.Renderer) {
 
@@ -103,16 +116,22 @@ func main() {
 	lastObstacleTick := sdl.GetTicks()
 
 	game.UpdateCallback = func(delta float64) {
+
+		energy += EnergyRegainedPerSecond * delta
+		if energy > 100. {
+			energy = 100.
+		}
+
 		moveSpeed := delta * 100
 
 		keystate := sdl.GetKeyboardState()
 
 		updateMissiles(moveSpeed * 3)
-		updateObstacles(delta)
+		updateObstacles(delta, explode)
 
 		if sdl.GetTicks() > lastObstacleTick+500 && rand.Intn(20) == 0 {
 			lastObstacleTick = sdl.GetTicks()
-			size := rand.Float64()*50.0 + 10.0
+			size := rand.Float64()*20.0 + 10.0
 			y := rand.Float64() * SCREEN_HEIGHT
 			x := SCREEN_WIDTH + size
 			speed := rand.Float64()*80.0 + 50.0
@@ -133,16 +152,17 @@ func main() {
 		}
 		if keystate[sdl.SCANCODE_RSHIFT] != 0 {
 			currentTick := sdl.GetTicks()
-			if currentTick > lastFire+300 {
+			if currentTick > lastFire+300 && energy > EnergyCostPerShot {
 				lastFire = currentTick
 				missiles = append(missiles, FloatPoint{x + 32, y})
+				energy -= EnergyCostPerShot
 				shoot.Play(1)
 			}
 		}
 	}
 
 	game.StatusCallback = func() string {
-		return fmt.Sprintf("Active missiles: %d", len(missiles))
+		return fmt.Sprintf("Energy: %3d   Score: %d", int(energy), score)
 	}
 
 	game.MainLoop(renderer, font)
@@ -183,6 +203,7 @@ func updateMissiles(moveSpeed float64) {
 	newMissiles := make([]FloatPoint, 0, len(missiles))
 	for _, p := range missiles {
 		p.X += moveSpeed
+
 		if p.X <= SCREEN_WIDTH {
 			newMissiles = append(newMissiles, p)
 		}
@@ -199,16 +220,32 @@ var obstacles = []Obstacle{}
 func drawObstacles(r *sdl.Renderer) {
 	r.SetDrawColor(255, 128, 100, 255)
 	for _, o := range obstacles {
-		rect := sdl.Rect{int32(o.X - o.Size), int32(o.Y - o.Size), int32(o.Size), int32(o.Size)}
+		rect := sdl.Rect{int32(o.X - o.Size), int32(o.Y - o.Size), int32(o.Size * 2), int32(o.Size * 2)}
 		r.DrawRect(&rect)
 	}
 }
 
-func updateObstacles(delta float64) {
+func updateObstacles(delta float64, explode *mix.Music) {
 	newObstacles := make([]Obstacle, 0, len(obstacles))
 	for _, o := range obstacles {
 		o.X -= delta * o.Speed
 		o.Angle += delta * o.Speed
+		xmin := o.X - o.Size
+		xmax := o.X + o.Size
+		ymin := o.Y - o.Size
+		ymax := o.Y + o.Size
+		for i, m := range missiles {
+
+			if m.X >= xmin && m.X <= xmax && m.Y >= ymin && m.Y <= ymax {
+				explode.Play(1)
+				o.X = -o.Size
+				missiles[i].X = SCREEN_WIDTH * 10
+				score += int(40 - o.Size)
+				break
+			}
+
+		}
+
 		if o.X > -o.Size {
 			newObstacles = append(newObstacles, o)
 		}

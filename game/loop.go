@@ -22,6 +22,7 @@ func MainLoop(renderer *sdl.Renderer, font *ttf.Font) {
 	lastSecond := lastTick
 	frames := 0
 	fpsText := gfx.CreateText(renderer, font, "FPS: ... "+StatusCallback(), sdl.Color{255, 255, 255, 255})
+	framesPerSecond := 0
 
 	for running {
 
@@ -34,11 +35,12 @@ func MainLoop(renderer *sdl.Renderer, font *ttf.Font) {
 
 		delta := float64(tick-lastTick) / 1000.0
 		lastTick = tick
+		fpsText.Destroy()
+		fpsText = gfx.CreateText(renderer, font, fmt.Sprintf("FPS: %3d ", framesPerSecond)+StatusCallback(), sdl.Color{255, 255, 255, 255})
 
 		if tick > (lastSecond + 1000) {
 			lastSecond = tick
-			fpsText.Destroy()
-			fpsText = gfx.CreateText(renderer, font, fmt.Sprintf("FPS: %d ", frames)+StatusCallback(), sdl.Color{255, 255, 255, 255})
+			framesPerSecond = frames
 			frames = 0
 		} else {
 			frames++
